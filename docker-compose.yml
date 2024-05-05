@@ -1,0 +1,20 @@
+version: '3'
+services:
+  yandex-cloud-bot:
+    restart: on-failure
+    image: aronmav/yandex-cloud-bot:latest
+    container_name: yandex-cloud-bot
+    environment:
+      - TELOXIDE_TOKEN=${TELOXIDE_TOKEN}
+      - YAUTH=${YAUTH}
+      - ACCESS_KEY=${ACCESS_KEY}
+      - ADMIN_ID=${ADMIN_ID}
+      - ROOT_DIR=${ROOT_DIR}
+      - DB_PATH=${DB_PATH}
+      - BOT_NAME=${BOT_NAME}
+      - LOG_PATH=${LOG_PATH}
+      - TMP_DIR=${TMP_DIR}
+    volumes:
+      - yandex-cloud-bot_data:/usr/local/bin/
+volumes:
+  yandex-cloud-bot_data:
