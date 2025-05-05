@@ -1,14 +1,13 @@
-use std::{error::Error, sync::Arc};
 use std::path::PathBuf;
+use std::{error::Error, sync::Arc};
 
+use crate::chat_server::ChatServer;
 use serde::Deserialize;
 use teloxide::{
     prelude::*,
     types::{InputFile, ParseMode},
     utils::command::BotCommands,
 };
-
-use crate::chat_server::ChatServer;
 
 #[derive(BotCommands, PartialEq, Debug)]
 #[command(rename_rule = "lowercase", description = "*Описание команд*")]
@@ -29,13 +28,11 @@ pub async fn handle(
     bot: Bot,
     msg: Message,
     cs: Arc<ChatServer>,
-) -> Result<(), Box<dyn Error + Send + Sync>>
-{
-    let text =
-        match msg.text() {
-            Some(text) => text,
-            None => return Ok(())
-        };
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let text = match msg.text() {
+        Some(text) => text,
+        None => return Ok(()),
+    };
 
     let mut response = String::from("");
 
@@ -59,8 +56,13 @@ pub async fn handle(
                         let first_name = msg.chat.first_name().unwrap_or_else(|| "");
                         let last_name = msg.chat.last_name().unwrap_or_else(|| "");
 
-                        cs.add_new_user(msg.chat.id.to_string(), &username, &first_name, &last_name)
-                            .await?;
+                        cs.add_new_user(
+                            msg.chat.id.to_string(),
+                            &username,
+                            &first_name,
+                            &last_name,
+                        )
+                        .await?;
                         let admin_user_id: UserId = UserId(cs.admin_id);
                         let admin_chat_id: ChatId = ChatId::from(admin_user_id);
                         str = format!("Новый пользователь: {username}, {first_name}, {last_name}");
@@ -88,20 +90,25 @@ pub async fn handle(
     }
 
     if !response.is_empty() {
-        bot.send_message(msg.chat.id, response.replace("_", "\\_")).parse_mode(ParseMode::MarkdownV2).await?;
+        bot.send_message(msg.chat.id, response.replace("_", "\\_"))
+            .parse_mode(ParseMode::MarkdownV2)
+            .await?;
     }
 
     Ok(())
 }
 
-pub async fn callback_handler(bot: Bot, q: CallbackQuery, cs: Arc<ChatServer>) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let is_file = cs.get_file_path(q.data.unwrap().as_str()).await?;
-    let chat = q.message.clone().unwrap().chat;
+pub async fn callback_handler(
+    bot: Bot,
+    q: CallbackQuery,
+    cs: Arc<ChatServer>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let is_file = cs.get_file_path(&q.data.clone().unwrap().as_str()).await?;
+    let chat = q.message.clone().unwrap().chat().clone();
 
     let url = format!(
         "https://cloud-api.yandex.net/v1/disk/resources/download?path=disk:{}{}",
-        cs.root_dir,
-        is_file.path
+        cs.root_dir, is_file.path
     );
 
     let client = reqwest::Client::new();
@@ -142,14 +149,16 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, cs: Arc<ChatServer>) -
         first_name,
         last_name,
     )
-        .await
-        .expect("Не удалось записать выполнить логирование");
+    .await
+    .expect("Не удалось записать выполнить логирование");
 
     let text: String = String::from("Файл обработки");
-    bot.answer_callback_query(q.id).await?;
-    if let Some(Message { id, chat, .. }) = q.message {
-        bot.edit_message_text(chat.id, id, text).await?;
-    } else if let Some(id) = q.inline_message_id {
+    bot.answer_callback_query(&q.id).await?;
+
+    if !&q.id.is_empty() {
+        bot.edit_message_text(chat.id, q.clone().message.unwrap().id(), text)
+            .await?;
+    } else if let Some(id) = &q.inline_message_id {
         bot.edit_message_text_inline(id, text).await?;
     }
 
